@@ -7,7 +7,7 @@
 ## 🌐 Live URL
 
 ```
-https://devpulse-api.onrender.com   ← replace with your deployment URL
+https://dev-pulse-murex-six.vercel.app/health
 ```
 
 ---
