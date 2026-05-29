@@ -86,16 +86,6 @@ export const createIssue = async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
-  // Validate that reporter exists (application-level FK check per spec)
-  const userCheck = await pool.query<{ id: number }>(
-    'SELECT id FROM users WHERE id = $1',
-    [reporterId],
-  );
-  if (userCheck.rows.length === 0) {
-    sendError(res, 'Reporter user not found.', StatusCodes.BAD_REQUEST);
-    return;
-  }
-
   const result = await pool.query<IssueRow>(
     `INSERT INTO issues (title, description, type, reporter_id)
      VALUES ($1, $2, $3, $4)
@@ -103,7 +93,13 @@ export const createIssue = async (req: Request, res: Response): Promise<void> =>
     [title.trim(), description.trim(), type, reporterId],
   );
 
-  sendSuccess(res, result.rows[0], 'Issue created successfully', StatusCodes.CREATED);
+  const reporter: ReporterSummary = {
+    id: req.user!.id,
+    name: req.user!.name,
+    role: req.user!.role,
+  };
+
+  sendSuccess(res, toPublicIssue(result.rows[0], reporter), 'Issue created successfully', StatusCodes.CREATED);
 };
 
 // ----------------------------------------------------------------
@@ -311,7 +307,16 @@ export const updateIssue = async (req: Request, res: Response): Promise<void> =>
     values,
   );
 
-  sendSuccess(res, updated.rows[0], 'Issue updated successfully');
+  const userResult = await pool.query<Pick<UserRow, 'id' | 'name' | 'role'>>(
+    'SELECT id, name, role FROM users WHERE id = $1',
+    [issue.reporter_id],
+  );
+  const reporterRow = userResult.rows[0];
+  const reporter: ReporterSummary = reporterRow
+    ? { id: reporterRow.id, name: reporterRow.name, role: reporterRow.role as UserRole }
+    : { id: issue.reporter_id, name: 'Unknown', role: 'contributor' };
+
+  sendSuccess(res, toPublicIssue(updated.rows[0], reporter), 'Issue updated successfully');
 };
 
 // ----------------------------------------------------------------
@@ -336,8 +341,8 @@ export const updateIssueStatus = async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  const result = await pool.query<IssueRow>(
-    'SELECT id FROM issues WHERE id = $1',
+  const result = await pool.query<Pick<IssueRow, 'id' | 'reporter_id'>>(
+    'SELECT id, reporter_id FROM issues WHERE id = $1',
     [issueId],
   );
   if (result.rows.length === 0) {
@@ -350,7 +355,16 @@ export const updateIssueStatus = async (req: Request, res: Response): Promise<vo
     [status, issueId],
   );
 
-  sendSuccess(res, updated.rows[0], 'Issue status updated successfully');
+  const userResult = await pool.query<Pick<UserRow, 'id' | 'name' | 'role'>>(
+    'SELECT id, name, role FROM users WHERE id = $1',
+    [result.rows[0].reporter_id],
+  );
+  const reporterRow = userResult.rows[0];
+  const reporter: ReporterSummary = reporterRow
+    ? { id: reporterRow.id, name: reporterRow.name, role: reporterRow.role as UserRole }
+    : { id: result.rows[0].reporter_id, name: 'Unknown', role: 'contributor' };
+
+  sendSuccess(res, toPublicIssue(updated.rows[0], reporter), 'Issue status updated successfully');
 };
 
 // ----------------------------------------------------------------

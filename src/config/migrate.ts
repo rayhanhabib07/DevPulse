@@ -36,10 +36,26 @@ const migrate = async (): Promise<void> => {
                        CHECK (type IN ('bug', 'feature_request')),
         status       VARCHAR(20)   NOT NULL DEFAULT 'open'
                        CHECK (status IN ('open', 'in_progress', 'resolved')),
-        reporter_id  INTEGER       NOT NULL,
+        reporter_id  INTEGER       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
         updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
       );
+    `);
+
+    // Add FK on existing databases that pre-date this constraint
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_issues_reporter'
+            AND table_name = 'issues'
+        ) THEN
+          ALTER TABLE issues
+            ADD CONSTRAINT fk_issues_reporter
+            FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
     console.log('✅ Table "issues" is ready.');
 

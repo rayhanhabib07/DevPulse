@@ -6,19 +6,21 @@ import { sendError } from '../utils/response';
 /**
  * Verifies the JWT in the Authorization header.
  * Attaches decoded payload to req.user on success.
- * Expects header format: Authorization: <token>  (no "Bearer" prefix per spec)
+ * Expects header format: Authorization: Bearer <token>
  */
 export const authenticate = (
   req: Request,
   res: Response,
   next: NextFunction,
 ): void => {
-  const token = req.headers.authorization;
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     sendError(res, 'Access denied. No token provided.', StatusCodes.UNAUTHORIZED);
     return;
   }
+
+  const token = authHeader.slice(7);
 
   try {
     req.user = verifyToken(token);

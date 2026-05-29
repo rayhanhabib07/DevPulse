@@ -30,8 +30,13 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
   const { name, email, password, role }: SignupBody = req.body;
 
   // Validate required fields
-  if (!name || !email || !password) {
+  if (!name?.trim() || !email || !password) {
     sendError(res, 'Name, email, and password are required.', StatusCodes.BAD_REQUEST);
+    return;
+  }
+
+  if (password.length < 8) {
+    sendError(res, 'Password must be at least 8 characters.', StatusCodes.BAD_REQUEST);
     return;
   }
 
